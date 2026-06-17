@@ -59,6 +59,7 @@ jobs:
           git commit -m "update state/logs [skip ci]" || echo "no changes"
           git push || echo "push skipped"
 
-      # 60日無活動による自動停止を防ぐ（スケジュールを生かし続ける）
-      - name: Keepalive
-        uses: gautamkrishnar/keepalive-workflow@v2
+      # 注: 60日リポジトリ無活動でスケジュールは自動停止する仕様。
+      # 上のstateコミットで活動が入り続けるので通常は問題ないが、もし停止したら
+      # Actionsタブから手動でEnableすれば復活する。
+      # （第三者製keepaliveアクションはアカウントのActionsポリシーで弾かれるため不使用）
