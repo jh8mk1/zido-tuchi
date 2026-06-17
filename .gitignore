@@ -1,0 +1,14 @@
+# 秘匿情報（絶対に上げない）。GitHub Actionsでは Secrets から毎回生成する
+config.py
+
+# Pythonキャッシュ
+__pycache__/
+*.pyc
+
+# launchdのローカルログ（GitHub運用では不要）
+logs/launchd.out.log
+logs/launchd.err.log
+
+# ※ state/state.json と logs/signals.csv は「追跡する」。
+#   GitHub Actionsは毎回まっさらなので、状態をリポジトリに保存しないと
+#   毎回初回起動扱い＝通知されない。これらは公開されても鍵や口座情報は含まない。

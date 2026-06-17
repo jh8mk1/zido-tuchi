@@ -1,0 +1,64 @@
+name: FX signal notify
+
+# 30分ごとに実行（冗長性のため）。鮮度窓70分と組み合わせ、1回スキップされても
+# 次の実行で取りこぼさない設計。GitHubのcronはベストエフォートなのでこの冗長性が重要。
+# ※ このリポジトリのルート = notify_system フォルダ（run.py がある階層）を想定。
+on:
+  schedule:
+    - cron: "0,30 * * * *"
+  workflow_dispatch: {}        # 手動実行も可（テスト用）
+
+# 状態ファイルを push するために書き込み権限が必要
+permissions:
+  contents: write
+
+# 同時実行を防ぐ（状態ファイルの競合回避）
+concurrency:
+  group: fx-notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests pandas numpy
+
+      - name: Generate config.py from secrets
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          cat > config.py <<EOF
+          SYMBOL = "USD/JPY"
+          DATA_SOURCE = "twelvedata"
+          TWELVE_DATA_API_KEY = "${TWELVE_DATA_API_KEY}"
+          BARS_5M = 5000
+          CSV_PATH = ""
+          DISCORD_WEBHOOK_URL = "${DISCORD_WEBHOOK_URL}"
+          TIMEZONE_SHIFT_HOURS = 9
+          DROP_LAST_BAR = True
+          SIGNAL_RECENT_MINUTES = 70
+          DRY_RUN = False
+          EOF
+
+      - name: Run notifier
+        run: python run.py
+
+      - name: Persist state & logs
+        run: |
+          git config user.name "fxnotify-bot"
+          git config user.email "bot@users.noreply.github.com"
+          mkdir -p state logs
+          git add -f state/state.json logs/signals.csv 2>/dev/null || true
+          git commit -m "update state/logs [skip ci]" || echo "no changes"
+          git push || echo "push skipped"
+
+      # 60日無活動による自動停止を防ぐ（スケジュールを生かし続ける）
+      - name: Keepalive
+        uses: gautamkrishnar/keepalive-workflow@v2

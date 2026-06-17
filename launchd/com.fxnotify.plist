@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ~/Library/LaunchAgents/com.fxnotify.plist に置く。
+     ProgramArguments のパスを自分の環境に書き換えること。
+     反映:   launchctl load   ~/Library/LaunchAgents/com.fxnotify.plist
+     停止:   launchctl unload ~/Library/LaunchAgents/com.fxnotify.plist -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.fxnotify</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/ryotaro/Desktop/FX/自動売買（デイトレ）/notify_system/run.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ryotaro/Desktop/FX/自動売買（デイトレ）/notify_system</string>
+
+    <!-- 5分(300秒)ごとに実行 -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/ryotaro/Desktop/FX/自動売買（デイトレ）/notify_system/logs/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ryotaro/Desktop/FX/自動売買（デイトレ）/notify_system/logs/launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
