@@ -66,6 +66,7 @@ class Strategy:
     entry_detector = ("pivot", 5)
     freshness_bars = 45
     exit_kind = "fixed"       # 'fixed'（SL/TP）または 'trailing'
+    recent_minutes = None     # 通知の鮮度窓(分)。Noneならconfigの既定値。手法ごとに上書き可
 
     # ---- サブクラスで実装：イベントから決済情報を埋めて Signal を返す ----
     def build_exit(self, ev, dfs) -> Signal:

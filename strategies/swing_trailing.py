@@ -19,6 +19,7 @@ class SwingTrailing(Strategy):
     entry_detector = ZZ
     freshness_bars = 45
     exit_kind = "trailing"
+    recent_minutes = 360      # 数日保有なので数時間遅れの通知でも成行で成立。GitHub遅延に強くする
 
     TRAIL_TF = "4h"
     TRAIL_ATR_MULT = 1.5
@@ -43,6 +44,7 @@ class SwingTrailing(Strategy):
             direction=ev["dir"], time=ev["time"], entry=round(entry, 3),
             sl=round(sl, 3), sl_pips=round(abs(sl_dist) / PIP, 1),
             tp=None, trail_pips=trail_pips,
-            note=("固定TPなし。初期トレールSL=エントリー∓トレール幅。"
-                  "以後は直近高値/安値の更新ごとにトレールを引き上げ/引き下げる（戻さない）。"),
+            note=("固定TPなし。初期SLは上記SL（C点基準）。価格が伸びたら "
+                  "買い=『最高値−トレール幅』／売り=『最安値＋トレール幅』までSLを更新（有利方向のみ・戻さない）。"
+                  "SLに当たったら決済。"),
         )

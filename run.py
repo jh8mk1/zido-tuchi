@@ -79,6 +79,17 @@ def main():
     dfs = datamod.build_frames(df5, tfs)
     print(f"[data] 5m={len(df5)}本  {df5.index[0]} 〜 {df5.index[-1]} JST")
 
+    # 現在時刻(JST)とFX市場オープン判定
+    import datetime as _dt
+    import pandas as pd
+    now_jst = _dt.datetime.utcnow() + _dt.timedelta(hours=getattr(config, "TIMEZONE_SHIFT_HOURS", 9))
+    _wd, _h = now_jst.weekday(), now_jst.hour   # Mon=0 .. Sun=6
+    market_closed = (_wd == 5 and _h >= 6) or (_wd == 6) or (_wd == 0 and _h < 7)
+    recent_min = getattr(config, "SIGNAL_RECENT_MINUTES", 70)
+    print(f"[time] now={now_jst:%Y-%m-%d %H:%M} JST / market_{'CLOSED' if market_closed else 'OPEN'}")
+    if market_closed:
+        print("[time] FX休場中: 新規エントリー通知はスキップ（決済判定と状態更新のみ）")
+
     total_new = 0
     for sid, strat in REGISTRY.items():
         sigs = strat.evaluate(dfs)
@@ -113,12 +124,17 @@ def main():
             if last_seen is None:
                 print(f"  [{sid}] 初回起動: ベースライン設定")
             else:
-                import pandas as pd
                 new = [s for s in sigs if s.time.isoformat() > last_seen]
-                # 実行間隔に応じた鮮度窓内のシグナルのみ実行（古い＝乗り遅れは無視）
-                cutoff = edf.index[-1] - pd.Timedelta(
-                    minutes=getattr(config, "SIGNAL_RECENT_MINUTES", 15))
+                # 鮮度判定: 「最新足から」と「実時刻(now)から」の両方で rmin 分以内。
+                # 厳しい方(=より新しい方)を採用。これで週末や遅延実行での古いシグナル誤通知を防ぐ。
+                # 窓は手法ごと（スイングは広め=遅延に強い、デイトレは狭め）。
+                rmin = strat.recent_minutes or recent_min
+                cutoff_bar = edf.index[-1] - pd.Timedelta(minutes=rmin)
+                cutoff_wall = pd.Timestamp(now_jst) - pd.Timedelta(minutes=rmin)
+                cutoff = max(cutoff_bar, cutoff_wall)
                 recent = [s for s in new if s.time >= cutoff]
+                if market_closed:
+                    recent = []   # 休場中は新規通知しない（状態は下で更新）
                 if recent:
                     sig = recent[-1]
                     notifier.send_discord(config.DISCORD_WEBHOOK_URL, sig, strat.emoji,

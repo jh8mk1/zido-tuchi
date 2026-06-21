@@ -19,6 +19,7 @@ class DaytradeV4(Strategy):
     entry_detector = ("pivot", 5)
     freshness_bars = 45
     exit_kind = "fixed"
+    recent_minutes = 20       # 浅いSLのデイトレは遅延通知だと約定がズレる。古いものは弾く
 
     # ADX適応RR
     ADX_TF = "1h"
