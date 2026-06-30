@@ -1,16 +1,15 @@
 {
   "daytrade_v4": {
-    "last_seen": "2026-06-30T04:10:00",
-    "position": {
-      "direction": "buy",
-      "entry": 161.796,
-      "sl": 161.703,
-      "entry_time": "2026-06-29T07:35:00",
-      "tp": 161.982
-    }
+    "last_seen": "2026-06-30T16:15:00",
+    "position": null
   },
   "swing_trailing": {
-    "last_seen": "2026-06-24T23:45:00",
-    "position": null
+    "last_seen": "2026-06-30T17:15:00",
+    "position": {
+      "direction": "buy",
+      "entry": 162.297,
+      "sl": 161.881,
+      "entry_time": "2026-06-30T17:15:00"
+    }
   }
 }
