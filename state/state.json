@@ -11,11 +11,6 @@
   },
   "swing_trailing": {
     "last_seen": "2026-07-21T20:45:00",
-    "position": {
-      "direction": "buy",
-      "entry": 162.751,
-      "sl": 162.408,
-      "entry_time": "2026-07-21T20:45:00"
-    }
+    "position": null
   }
 }
