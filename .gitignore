@@ -12,3 +12,4 @@ logs/launchd.err.log
 # ※ state/state.json と logs/signals.csv は「追跡する」。
 #   GitHub Actionsは毎回まっさらなので、状態をリポジトリに保存しないと
 #   毎回初回起動扱い＝通知されない。これらは公開されても鍵や口座情報は含まない。
+state/state.json.bak-*

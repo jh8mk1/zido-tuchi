@@ -1,10 +1,10 @@
 {
-  "daytrade_v4": {
-    "last_seen": "2026-07-28T20:45:00",
+  "daytrade_v5": {
+    "last_seen": "2026-07-26T20:40:00",
     "position": null
   },
-  "swing_trailing": {
-    "last_seen": "2026-07-24T01:30:00",
+  "swing_s1": {
+    "last_seen": "2026-07-28T16:00:00",
     "position": null
   }
 }

@@ -9,6 +9,10 @@ ZZ = ("zigzag", 15, 0.27)
 
 @register
 class DaytradeV4(Strategy):
+    # 2026-07 デイトレは v5（honest-dow ABC + ADXレジーム）へ移行。v4は無効化して保管。
+    # 復活させたいときは disabled=False に戻すだけ（未決済ポジションは無し状態で停止済み）。
+    disabled = True
+
     id = "daytrade_v4"
     name = "デイトレv4（ダウ押し目+ADX適応RR）"
     kind = "デイトレ"

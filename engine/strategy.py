@@ -67,6 +67,7 @@ class Strategy:
     freshness_bars = 45
     exit_kind = "fixed"       # 'fixed'（SL/TP）または 'trailing'
     recent_minutes = None     # 通知の鮮度窓(分)。Noneならconfigの既定値。手法ごとに上書き可
+    max_hold_bars = None      # entry_tf 基準の最大保有本数。超えたら終値で強制決済（Noneで無制限）
 
     # ---- サブクラスで実装：イベントから決済情報を埋めて Signal を返す ----
     def build_exit(self, ev, dfs) -> Signal:
@@ -104,6 +105,10 @@ class Strategy:
                         return False, {"price": sl, "time": idx[i], "reason": "SL"}
                     if lows[i] <= tp:
                         return False, {"price": tp, "time": idx[i], "reason": "TP"}
+                # 時間切れ（SL/TP判定の後に見る＝同足で両方成立ならSL/TP優先）
+                if self.max_hold_bars is not None and (i + 1) >= self.max_hold_bars:
+                    return False, {"price": round(float(sub["Close"].values[i]), 3),
+                                   "time": idx[i], "reason": "時間切れ(7日)"}
             return True, None
 
         # trailing

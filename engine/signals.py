@@ -7,6 +7,47 @@ import numpy as np
 from . import indicators as ind
 
 
+def lag_broadcast(values, base_index, upper_index):
+    """上位足の値配列を下位足へ『1本ラグ』でブロードキャスト（先読み安全）。
+    下位足バーを含む上位足バー k ではなく、直前に確定した k-1 の値を渡す
+    （含む足の終値/指標はその足の終端=未来のため使用不可）。
+    バックテスト lab.broadcast_lag と同一。"""
+    v = np.asarray(values, dtype=float)
+    lag = np.empty(len(v))
+    lag[0] = np.nan
+    lag[1:] = v[:-1]
+    k = np.clip(
+        np.searchsorted(upper_index.values, base_index.values, side="right") - 1,
+        0, len(v) - 1,
+    )
+    return lag[k]
+
+
+def correct_dow_env_dir(entry_df, env_specs, dfs):
+    """correct-dow-5m 方式の環境方向（honest-v5）。
+    上位足の確定スイング水準を1本ラグ展開し、『現在の5m終値』と比較して各上位足の
+    方向を出し、全上位足が一致したときだけ 'up'/'down' を返す。
+    combined_env_dir（上位足終値ベース）の先読み無し版・より即応。"""
+    c5 = entry_df["Close"].values
+    n = len(entry_df)
+    per_env = []
+    for tf, det_spec in env_specs:
+        udf = dfs[tf]
+        det = ind.make_detector(det_spec)
+        lh, ll = ind.dow_levels(udf, det(udf))
+        lh5 = lag_broadcast(lh, entry_df.index, udf.index)
+        ll5 = lag_broadcast(ll, entry_df.index, udf.index)
+        d = np.zeros(n, dtype=int)
+        d[(~np.isnan(lh5)) & (c5 > lh5)] = 1
+        d[(~np.isnan(ll5)) & (c5 < ll5)] = -1
+        per_env.append(d)
+    out = np.empty(n, dtype=object)
+    for i in range(n):
+        vals = {e[i] for e in per_env}
+        out[i] = "up" if vals == {1} else ("down" if vals == {-1} else "range")
+    return out
+
+
 def combined_env_dir(entry_index, env_specs, dfs):
     """エントリー足の各バーについて、複数の環境足ダウが全て一致した方向を返す。
     env_specs: [(tf, detector_spec), ...]  例 [("15min",("zigzag",15,0.27)),("1h",...)]

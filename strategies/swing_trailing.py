@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """スイング手法：15分ZigZag ABC + 1H/4H MSBダウ二重一致 + 4H ATR×1.5トレーリング。
-全期間PF 2.30 / σ 0.87 / 11年プラス。固定TPなし＝トレールで伸ばす。"""
+
+【停止済み・2026-07】報告値 PF2.30 は MTF ルックアヘッド（上位足の終値=未来 でダウ判定）
+の産物であり、正しく検証すると実力は PF≈0.65 の負け手法だった（手法書 §1）。
+後継は swing_s1.py（V6.1 エンジンB）。復活させてはならない。記録のためファイルのみ残す。
+"""
 from engine.strategy import Strategy, Signal, register, PIP
 from engine import indicators as ind
 
@@ -9,6 +13,7 @@ ZZ = ("zigzag", 15, 0.27)
 
 @register
 class SwingTrailing(Strategy):
+    disabled = True            # ルックアヘッド由来の負け手法。復活禁止（上のdocstring参照）
     id = "swing_trailing"
     name = "スイング（ダウ押し目+4H ATRトレーリング）"
     kind = "スイング"

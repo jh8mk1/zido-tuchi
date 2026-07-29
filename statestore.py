@@ -62,3 +62,13 @@ def _log_row(row):
                         "参考エントリー", "SL", "SL幅pips", "TP", "RR", "トレール幅pips",
                         "ADX", "決済情報"])
         w.writerow([datetime.now().isoformat(timespec="seconds")] + row)
+
+
+def log_veto(sig, holder_sid, holder_dir):
+    """§7-1 で見送ったエントリーの記録（フォワード検証用。通知はしない）。"""
+    _log_row(["VETO", sig.strategy_id, sig.strategy_name, sig.kind, sig.direction,
+              f"{sig.time:%Y-%m-%d %H:%M}", sig.entry, sig.sl, sig.sl_pips,
+              sig.tp if sig.tp is not None else "",
+              sig.rr if sig.rr is not None else "", "",
+              sig.adx if sig.adx is not None else "",
+              f"逆方向見送り: {holder_sid}が{holder_dir}を保有中"])

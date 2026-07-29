@@ -139,6 +139,36 @@ def dow_msb_series(df, swings):
 
 
 # ----------------------------------------------------------------
+# correct-dow 用スイング水準：各バー時点で有効な直近確定スイング高値/安値
+#   dow_msb_series が「上位足の終値」で判定するのに対し、こちらは水準だけを返し、
+#   呼び出し側が「下位足(5m)の現在終値」と比較して方向を出す（honest-v5 方式）。
+# ----------------------------------------------------------------
+def dow_levels(df, swings):
+    """各バー i 時点で有効な直近確定スイング (H水準, L水準) の配列を返す。
+    v4_honest._dow_levels と同一規則（同種連続は極値を保持、異種で更新）。"""
+    n = len(df)
+    lastH = np.full(n, np.nan)
+    lastL = np.full(n, np.nan)
+    ptr, lh, ll, lt = 0, np.nan, np.nan, None
+    for i in range(n):
+        while ptr < len(swings) and swings[ptr]["confirmed"] <= i:
+            s = swings[ptr]; ptr += 1
+            if lt == s["type"]:
+                if s["type"] == "H" and (np.isnan(lh) or s["price"] >= lh):
+                    lh = s["price"]
+                elif s["type"] == "L" and (np.isnan(ll) or s["price"] <= ll):
+                    ll = s["price"]
+            else:
+                if s["type"] == "H":
+                    lh = s["price"]
+                else:
+                    ll = s["price"]
+                lt = s["type"]
+        lastH[i], lastL[i] = lh, ll
+    return lastH, lastL
+
+
+# ----------------------------------------------------------------
 # ハイブリッド型ダウ（将来の手法用。HH/HL認定 + キーレベル否定）
 #   返り値: states配列 + key_level配列（押し安値/戻り高値）
 # ----------------------------------------------------------------
@@ -227,3 +257,30 @@ def check_abc(sw, direction):
             if A["type"] == "H" and B["type"] == "L" and C["type"] == "H" and C["price"] < A["price"]:
                 return B, C
     return None, None
+
+
+# ----------------------------------------------------------------
+# エンジンB（スイングS1）用。バックテスト engine.py の定義と厳密に一致させること。
+# ※ ATR は Wilder ではなく単純移動平均版。上の wilder_atr と混同しないこと
+#   （エンジンBのSL幅は sma_atr を使う＝バックテストの E.atr と同一）。
+# ----------------------------------------------------------------
+def ema(close, n):
+    """EMA。バックテスト E.ema と同一（ewm span=n, adjust=False）。"""
+    return pd.Series(close).ewm(span=n, adjust=False).mean().values
+
+
+def rsi(close, n=14):
+    """RSI。バックテスト E.rsi と同一（Wilder平滑ではなく単純移動平均版）。"""
+    d = np.diff(close, prepend=close[0])
+    up = pd.Series(np.where(d > 0, d, 0.0)).rolling(n).mean().values
+    dn = pd.Series(np.where(d < 0, -d, 0.0)).rolling(n).mean().values
+    rs = np.divide(up, dn, out=np.full_like(up, np.inf), where=dn > 0)
+    return 100 - 100 / (1 + rs)
+
+
+def sma_atr(df, n=14):
+    """ATR（単純移動平均版）。バックテスト E.atr と同一。Wilder版は wilder_atr。"""
+    h, l, c = df["High"].values, df["Low"].values, df["Close"].values
+    pc = np.roll(c, 1); pc[0] = c[0]
+    tr = np.maximum(h - l, np.maximum(np.abs(h - pc), np.abs(l - pc)))
+    return pd.Series(tr, index=df.index).rolling(n).mean().values

@@ -23,6 +23,25 @@ import notifier                              # noqa: E402
 import statestore                            # noqa: E402
 
 
+def opposite_holder(states, sid, direction):
+    """
+    ポートフォリオ層（手法書 §7-1）。
+
+    他エンジンが *逆方向* のポジションを保有中なら (手法ID, その方向) を返す。
+    該当なしなら (None, None)。同方向の重複は許可するため None を返す。
+
+    根拠: 重複トレードを3群に分けると赤字は逆方向群のみ（PF0.70）。
+    同方向群は全群中で最も勝つ（PF1.48）ので止めてはならない。
+    """
+    for osid, ost in states.items():
+        if osid == sid:
+            continue
+        p = ost.get("position")
+        if p is not None and p["direction"] != direction:
+            return osid, p["direction"]
+    return None, None
+
+
 def load_config():
     for name in ("config.py", "config.example.py"):
         p = ROOT / name
@@ -57,8 +76,9 @@ def main():
     if args.test:
         config.DATA_SOURCE = "csv"
         config.DRY_RUN = True
-        if args.csv:
-            config.CSV_PATH = args.csv
+    if args.csv:                      # --test 以外でもCSVを使えるようにする
+        config.DATA_SOURCE = "csv"    # （--dry-run で決済・§7-1ゲートまで通すため）
+        config.CSV_PATH = args.csv
     if args.dry_run:
         config.DRY_RUN = True
 
@@ -90,35 +110,53 @@ def main():
     if market_closed:
         print("[time] FX休場中: 新規エントリー通知はスキップ（決済判定と状態更新のみ）")
 
-    total_new = 0
-    for sid, strat in REGISTRY.items():
-        sigs = strat.evaluate(dfs)
-        sigs.sort(key=lambda x: x.time)
-        edf = dfs[strat.entry_tf]
+    # 全手法のシグナルを先に評価
+    evals = {sid: sorted(s.evaluate(dfs), key=lambda x: x.time)
+             for sid, s in REGISTRY.items()}
 
-        if args.test:
+    if args.test:
+        for sid, strat in REGISTRY.items():
+            sigs = evals[sid]
             if sigs:
                 for sig in sigs[-2:]:
                     notifier.send_discord(config.DISCORD_WEBHOOK_URL, sig, strat.emoji, dry_run=True)
                 print(f"  [{sid}] 直近シグナル {sigs[-1].time:%Y-%m-%d %H:%M}（テスト表示・状態未更新）")
             else:
                 print(f"  [{sid}] シグナルなし（テスト）")
-            continue
+        return
 
+    # ============================================================
+    # パス1: 全手法の決済判定を先に済ませる
+    #   ポートフォリオ層（パス2）が「他エンジンの現在の保有方向」を見るため、
+    #   決済済みのポジションを保有中と誤認しないよう順序を分ける。
+    # ============================================================
+    states = {}
+    for sid, strat in REGISTRY.items():
         st = statestore.get(sid)
-        latest_iso = sigs[-1].time.isoformat() if sigs else st["last_seen"]
-
-        # 1) 保有ポジションの決済判定（1ポジション制）
         if st["position"] is not None:
             still, ex = strat.manage(st["position"], dfs)
             if not still:
-                notifier.send_exit(config.DISCORD_WEBHOOK_URL, strat, st["position"], ex,
-                                   dry_run=config.DRY_RUN)
+                virtual = st["position"].get("virtual", False)
+                if not virtual:
+                    notifier.send_exit(config.DISCORD_WEBHOOK_URL, strat, st["position"], ex,
+                                       dry_run=config.DRY_RUN)
                 statestore.log_exit(sid, strat.name, strat.kind, st["position"], ex)
                 st["position"] = None
-                print(f"  [{sid}] 決済目安到達: {ex['reason']} @ {ex['price']}")
+                tagv = "（仮想・通知なし）" if virtual else ""
+                print(f"  [{sid}] 決済目安到達{tagv}: {ex['reason']} @ {ex['price']}")
+        states[sid] = st
 
-        # 2) フラット時のみ新規エントリー通知
+    # ============================================================
+    # パス2: 新規エントリー（ポートフォリオ層のゲートつき）
+    # ============================================================
+    total_new = 0
+    total_veto = 0
+    for sid, strat in REGISTRY.items():
+        sigs = evals[sid]
+        edf = dfs[strat.entry_tf]
+        st = states[sid]
+        latest_iso = sigs[-1].time.isoformat() if sigs else st["last_seen"]
+
         if st["position"] is None and sigs:
             last_seen = st["last_seen"]
             if last_seen is None:
@@ -137,21 +175,37 @@ def main():
                     recent = []   # 休場中は新規通知しない（状態は下で更新）
                 if recent:
                     sig = recent[-1]
-                    notifier.send_discord(config.DISCORD_WEBHOOK_URL, sig, strat.emoji,
-                                          dry_run=config.DRY_RUN)
-                    statestore.log_entry(sig)
-                    st["position"] = strat.position_from_signal(sig)
-                    total_new += 1
-                    print(f"  [{sid}] 新規エントリー通知 {sig.direction} {sig.time:%m-%d %H:%M}")
+                    holder, hdir = opposite_holder(states, sid, sig.direction)
+                    if holder is not None:
+                        # 【手法書§7-1】逆方向の重複は建てない。
+                        # ただしポジション枠は「仮想ポジション」として埋める。
+                        # バックテスト apply_position_rule はエンジン内部の仮想ポジションを
+                        # そのまま進める前提で検証しており、ここでフラットに戻すと
+                        # 直後の別シグナルを拾って挙動がズレるため。
+                        pos = strat.position_from_signal(sig)
+                        pos["virtual"] = True
+                        st["position"] = pos
+                        statestore.log_veto(sig, holder, hdir)
+                        total_veto += 1
+                        print(f"  [{sid}] §7-1で見送り: {sig.direction} "
+                              f"（{holder}が{hdir}を保有中）→ 仮想ポジションで枠を確保")
+                    else:
+                        notifier.send_discord(config.DISCORD_WEBHOOK_URL, sig, strat.emoji,
+                                              dry_run=config.DRY_RUN)
+                        statestore.log_entry(sig)
+                        st["position"] = strat.position_from_signal(sig)
+                        total_new += 1
+                        print(f"  [{sid}] 新規エントリー通知 {sig.direction} {sig.time:%m-%d %H:%M}")
                 else:
                     print(f"  [{sid}] 新規なし（フラット）")
         elif st["position"] is not None:
-            print(f"  [{sid}] 保有中につき新規シグナル抑制")
+            tagv = "（仮想）" if st["position"].get("virtual") else ""
+            print(f"  [{sid}] 保有中{tagv}につき新規シグナル抑制")
 
         st["last_seen"] = latest_iso
         statestore.put(sid, st)
 
-    print(f"[done] 新規エントリー通知 計{total_new}件")
+    print(f"[done] 新規エントリー通知 計{total_new}件 / §7-1見送り {total_veto}件")
 
 
 if __name__ == "__main__":
