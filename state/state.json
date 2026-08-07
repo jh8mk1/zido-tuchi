@@ -5,12 +5,6 @@
   },
   "swing_s1": {
     "last_seen": "2026-08-06T16:00:00",
-    "position": {
-      "direction": "sell",
-      "entry": 157.858,
-      "sl": 158.486,
-      "entry_time": "2026-08-06T16:00:00",
-      "tp": 156.288
-    }
+    "position": null
   }
 }
