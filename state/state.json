@@ -4,7 +4,13 @@
     "position": null
   },
   "swing_s1": {
-    "last_seen": "2026-10-05T16:00:00",
-    "position": null
+    "last_seen": "2026-10-08T00:00:00",
+    "position": {
+      "direction": "sell",
+      "entry": 157.952,
+      "sl": 158.502,
+      "entry_time": "2026-10-08T00:00:00",
+      "tp": 156.575
+    }
   }
 }
