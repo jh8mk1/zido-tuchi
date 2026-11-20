@@ -1,16 +1,10 @@
 {
   "daytrade_v5": {
-    "last_seen": "2026-11-19T22:05:00",
+    "last_seen": "2026-11-20T14:40:00",
     "position": null
   },
   "swing_s1": {
     "last_seen": "2026-11-20T08:00:00",
-    "position": {
-      "direction": "buy",
-      "entry": 159.547,
-      "sl": 158.905,
-      "entry_time": "2026-11-18T08:00:00",
-      "tp": 161.152
-    }
+    "position": null
   }
 }
